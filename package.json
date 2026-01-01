@@ -1,0 +1,12 @@
+{
+  "name": "hono-htmz",
+  "scripts": {
+    "dev": "bun run --hot src/server.js"
+  },
+  "dependencies": {
+    "hono": "^4.11.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
