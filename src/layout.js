@@ -57,7 +57,7 @@ export const layout = ({ title = "My App", body = "", scripts = "" }) => `
     }
   </script>
 
-  <iframe hidden="" name="htmz" onload="window.htmz(this)"></iframe>
+  <iframe hidden="" name="htmz" id="htmz" onload="window.htmz(this)"></iframe>
   ${scripts}
 </body>
 </html>

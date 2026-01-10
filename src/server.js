@@ -11,6 +11,9 @@ import { renderAllUsers } from "./utils.js";
 import { updateStatus } from "./db.js"
 
 import { renderUsersWithFilter } from "./utils.js";
+import { renderUserEditWithValidate } from "./utils.js";
+
+import { renderInfiniteScrollPage, renderNamesByPage } from "./utils.js";
 
 const app = new Hono()
 
@@ -18,8 +21,7 @@ const app = new Hono()
 app.use("/public/*", serveStatic({ root: "./" }));
 
 app.get('/', (c) => {
-  return c.text('Hello Hono 2!')
-});
+  return c.text('Hello Hono !') });
 
 app.get('/examples/ajax-update', (c) => {
   return c.html(
@@ -39,6 +41,7 @@ app.get('/examples/ajax-update', (c) => {
 app.get('/api/new-content-route', (c) => {
   return c.html('Ajax Update Content')  
 })
+
 
 app.get('/examples/inline-edit', (c) => {
   return c.html(
@@ -63,6 +66,12 @@ app.get('/examples/', (c) => {
 
         <br>
         <a href='./instant-search'>Instant Search</a>
+
+        <br>
+        <a href='./inline-validation'>Inline Validation</a>
+
+        <br>
+        <a href='./infinite-scroll'>Infinite Scroll</a>
       `
     })
   )
@@ -166,5 +175,138 @@ app.post('/examples/instant-search', async (c) => {
     renderUsersWithFilter(body['search'])
   )
 })
+
+app.get('/examples/inline-validation', (c) => {
+  return c.html(
+    layout({
+      title: 'Inline Validation',
+      body: 
+      `<div id="demo">
+        ${renderUserEditWithValidate()}
+      </div>
+      `
+    })
+  )
+})
+
+app.post('/examples/inline-validation', async (c) => {
+
+  const body = await c.req.parseBody()
+  console.log(body['first_name'])
+
+  const firstName = body['first_name']
+  console.log(firstName.length)
+
+  let err = {}
+
+  if (firstName.length > 2){
+    updateUser(body)
+  } else {
+    err = {
+      "first_name": "Text is too short!"
+    }
+  }
+
+  return c.html(
+    renderUserEditWithValidate(err, body)
+  )
+})
+
+app.get('/examples/infinite-scroll', (c) => {
+  const page = parseInt(c.req.query('page') || '2')
+  console.log('page:', page)
+
+  const result = layout({
+        title: "Infinite Scroll",
+        body: `
+          <div id="tmp-div">
+            <input type="hidden" name="page" value="${page}"">
+          </div>
+          ${renderInfiniteScrollPage()}
+        `,
+        scripts: `
+          <script>
+
+          // const target = document.getElementById('demo')
+//          const target = document.getElementById('tmp-div')
+//          console.log(target)
+//
+//          const tbody = document.getElementById('table-body')
+//
+//          const link = document.getElementById('link')
+//          console.log(link)
+//
+//          const observer = new MutationObserver((mutations) => {
+//            for (const mutation of mutations) {
+//              // if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+//              if (mutation.addedNodes.length > 0) {
+//                // Logic for when the fragment arrives
+//                console.log("Response fragment detected in target!");
+//                console.log("addedNodes:", mutation.addedNodes.length)
+//                
+//                // Trigger your cloning logic or UI updates here
+//                const template = target.querySelector('#tpl-more-rows');
+//
+//                if (template !== null) {
+//                  const clone = template.content.cloneNode(true);
+//                  tbody.appendChild(clone) 
+//                }
+//
+//                // const tmpDiv = document.getElementById('tmp-div')
+//                // console.log('tmpDiv page', tmpDiv.dataset.page)
+//                // const page = document.querySelector('input[name="page"]').value
+//                // console.log('page:',page )
+//
+//                // url.searchParams.set('page', tmpDiv.dataset.page)
+//
+//                // link.href="/api/load-more?page=" + tmpDiv.dataset.page
+//                // link.href="/api/load-more?page=" + page
+//              }
+//            }
+//          });
+//
+//          // observer.observe(target, { childList: true });
+//          observer.observe(document.body, { childList: true });
+//          
+//          const observerA = new MutationObserver((mutations) => {
+//            mutations.forEach(mutation => {
+//              mutation.addedNodes.forEach(node => {
+//                if (node.nodeType === 1) {
+//                  // 'node' is now your template reference in the main DOM
+//                  console.log("Referencing new content:", node);
+//                }
+//              });
+//            });
+//          });
+//
+//          // observerA.observe(document.body, { childList: true });
+//
+//          document.addEventListener('partialLoaded', (e) => {
+//            console.log('Partial says:', e.detail.status)
+//          })
+          </script>
+        `
+      })
+   
+  // result = renderNamesByPage()
+  return c.html(result)
+})
+
+//app.get('/api/rows', (c) => {
+//  const page = parseInt(c.req.query('page') || '0')
+//
+//  return c.html(
+//    renderNamesByPage(page)
+//  )
+//})
+
+app.get('/api/load-more', (c) => {
+  const page = parseInt(c.req.query('page') || '0')
+
+  return c.html(
+    renderNamesByPage(page)
+  )
+})
+
 
 export default app
