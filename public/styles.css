@@ -1,6 +1,6 @@
 body {
-  /* Order: 50px (Top), 0 (Right), 0 (Bottom), 25px (Left)
-    This removes the default browser margin on the right and bottom.
-  */
-  margin: 50px 0 0 25px;
+  margin-top: 40px;
+  margin-right: 25px;
+  margin-bottom: var(--spacing); /* using Pico's internal spacing variable */
+  margin-left: 25px;
 }

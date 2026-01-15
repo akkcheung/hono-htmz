@@ -2,6 +2,7 @@ import { html } from 'hono/html';
 import { getFirstUser, getAllUsers } from './db.js';
 import { getUsersWithFilter } from './db.js';
 import { getNamesByPage, getCountByName } from './db.js';
+import { getAllComments } from './db.js';
 
 export function renderUser() {
 
@@ -180,6 +181,7 @@ export function renderNamesByPage(page=0) {
   return html`
     <div id="tmp-div">
       <input type="hidden" name="page" value="${next}">
+
       <template id="tpl-more-rows"> 
       ${rows.map((r) => html`
         <tr>
@@ -188,35 +190,66 @@ export function renderNamesByPage(page=0) {
         </tr>
       `)}
       </template> 
-    <script>
-      (function(){
-        console.log('Run function in html fragment!')
 
-          const parent = document.currentScript.parentElement;
-          // console.log('parent:', parent)
+      <script>
+        (function(){
+          console.log('Run function in html fragment!')
 
-          const template = parent.querySelector('#tpl-more-rows')
-          // console.log('template:',template)
+            const parent = document.currentScript.parentElement;
+            // console.log('parent:', parent)
 
-          // Accessing the main document from INSIDE an iframe
-          const mainDoc = window.parent.document;
-          // console.log('mainDoc', mainDoc)
+            const template = parent.querySelector('#tpl-more-rows')
+            // console.log('template:',template)
 
-          const tbody = mainDoc.getElementById('table-body')
-          // console.log('tbody:', tbody)
+            // Accessing the main document from INSIDE an iframe
+            const mainDoc = window.parent.document;
+            // console.log('mainDoc', mainDoc)
 
-          const clone = template.content.cloneNode(true);
-          tbody.appendChild(clone) 
+            const tbody = mainDoc.getElementById('table-body')
+            // console.log('tbody:', tbody)
 
-          const page = parent.querySelector('input[name="page"]').value
-          const link = mainDoc.getElementById('link')
+            const clone = template.content.cloneNode(true);
+            tbody.appendChild(clone) 
 
-          link.href="/api/load-more?page=" + page
+            const page = parent.querySelector('input[name="page"]').value
+            const link = mainDoc.getElementById('link')
 
-      })();
-    </script>
+            link.href="/api/load-more?page=" + page
+
+        })();
+      </script>
     </div>
-
-
     `
+}
+
+export function renderCommentForm() {
+  return html`
+        <form id="my-form" action="/api/sent" target=htmz method="POST">
+          <label>
+          Comments:
+          <textarea name="comment_body"></textarea>
+          </label>
+          <button type="submit" style="width: auto;">Submit</button>
+        </form>
+   `
+}
+
+export function renderCommentsDiv() {
+
+  const rows= getAllComments()
+  console.log('comments:', rows)
+
+  return html`
+    <template id='tpl-comments'>
+      <ul>
+      ${rows.map((r) => html`<li>${r.body}</li>`)}
+      </ul>
+      <script>
+        (function(){
+          console.log('Run function in html fragment!')
+
+        })();
+      </script>
+    </template>
+  `
 }

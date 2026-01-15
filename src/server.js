@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html';
-
 import { serveStatic } from "hono/bun"; // use `serve-static` for Node
+// import { streamSSE } from 'hono/streaming'
+import { stream } from 'hono/streaming'
+
+import { EventEmitter } from "node:events";
+
 import { layout } from './layout.js'
 
 import { renderUser, renderUserEdit } from "./utils.js";
@@ -15,7 +19,12 @@ import { renderUserEditWithValidate } from "./utils.js";
 
 import { renderInfiniteScrollPage, renderNamesByPage } from "./utils.js";
 
+import { renderCommentForm, renderCommentsDiv } from "./utils.js";
+import { addComment } from "./db.js"
+
 const app = new Hono()
+
+const dbEvents = new EventEmitter()
 
 // Static files
 app.use("/public/*", serveStatic({ root: "./" }));
@@ -72,6 +81,9 @@ app.get('/examples/', (c) => {
 
         <br>
         <a href='./infinite-scroll'>Infinite Scroll</a>
+
+        <br>
+        <a href='./server-events'>Server Events</a>
       `
     })
   )
@@ -225,80 +237,12 @@ app.get('/examples/infinite-scroll', (c) => {
           ${renderInfiniteScrollPage()}
         `,
         scripts: `
-          <script>
-
-          // const target = document.getElementById('demo')
-//          const target = document.getElementById('tmp-div')
-//          console.log(target)
-//
-//          const tbody = document.getElementById('table-body')
-//
-//          const link = document.getElementById('link')
-//          console.log(link)
-//
-//          const observer = new MutationObserver((mutations) => {
-//            for (const mutation of mutations) {
-//              // if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-//              if (mutation.addedNodes.length > 0) {
-//                // Logic for when the fragment arrives
-//                console.log("Response fragment detected in target!");
-//                console.log("addedNodes:", mutation.addedNodes.length)
-//                
-//                // Trigger your cloning logic or UI updates here
-//                const template = target.querySelector('#tpl-more-rows');
-//
-//                if (template !== null) {
-//                  const clone = template.content.cloneNode(true);
-//                  tbody.appendChild(clone) 
-//                }
-//
-//                // const tmpDiv = document.getElementById('tmp-div')
-//                // console.log('tmpDiv page', tmpDiv.dataset.page)
-//                // const page = document.querySelector('input[name="page"]').value
-//                // console.log('page:',page )
-//
-//                // url.searchParams.set('page', tmpDiv.dataset.page)
-//
-//                // link.href="/api/load-more?page=" + tmpDiv.dataset.page
-//                // link.href="/api/load-more?page=" + page
-//              }
-//            }
-//          });
-//
-//          // observer.observe(target, { childList: true });
-//          observer.observe(document.body, { childList: true });
-//          
-//          const observerA = new MutationObserver((mutations) => {
-//            mutations.forEach(mutation => {
-//              mutation.addedNodes.forEach(node => {
-//                if (node.nodeType === 1) {
-//                  // 'node' is now your template reference in the main DOM
-//                  console.log("Referencing new content:", node);
-//                }
-//              });
-//            });
-//          });
-//
-//          // observerA.observe(document.body, { childList: true });
-//
-//          document.addEventListener('partialLoaded', (e) => {
-//            console.log('Partial says:', e.detail.status)
-//          })
-          </script>
+          <script></script>
         `
       })
    
-  // result = renderNamesByPage()
   return c.html(result)
 })
-
-//app.get('/api/rows', (c) => {
-//  const page = parseInt(c.req.query('page') || '0')
-//
-//  return c.html(
-//    renderNamesByPage(page)
-//  )
-//})
 
 app.get('/api/load-more', (c) => {
   const page = parseInt(c.req.query('page') || '0')
@@ -308,5 +252,139 @@ app.get('/api/load-more', (c) => {
   )
 })
 
+app.get('/examples/server-events', (c) => {
 
-export default app
+  const result = layout({
+        title: "Server Events",
+        body: `
+          ${renderCommentForm()}
+          ${renderCommentsDiv()}      
+          <div id='comments'></div>
+          <a href="/api/comments#comments" id="link" target=htmz>Click to refresh comments</a>
+
+        `,
+        scripts: `
+          <script>
+            const eventSource = new EventSource('http://localhost:3000/sse');
+            const container = document.getElementById('comments')
+
+            const getComments = async () => { 
+              try {
+                const response = await fetch('/api/comments', {
+                  headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                      'Pragma': 'no-cache',
+                    'Expires': '0'
+                  }
+                })
+
+                if (response.ok){
+                  console.log("fetch called!")
+
+                  const target = document.querySelector('#comments')
+                  console.log('target:', target)
+                  
+                  const htmlText = await response.text()
+                  const parser = new DOMParser();
+                  const doc = parser.parseFromString(htmlText, 'text/html');
+                  
+                  const template = doc.querySelector('#tpl-comments')
+                  console.log('template:', template)
+                  
+                  const clone = template.content.cloneNode(true)
+                   
+                  target.replaceChildren(clone)
+                }
+              } catch (err){
+              }
+            } 
+            
+            getComments()
+
+            // Listen for the specific 'update' event we named in the backend
+            eventSource.addEventListener('database-update', async (event) => {
+              console.log('Server says: ', event.data)
+            
+                // document.getElementById('link').click()
+                await getComments()  
+
+            });
+
+            // Error handling
+            eventSource.onerror = (err) => {
+                console.error("EventSource failed:", err);
+                // The browser will automatically try to reconnect
+            };
+          </script>
+        `
+      })
+   
+
+
+  return c.html(result)
+
+})
+
+app.post('/api/sent', async (c) => {
+
+  const body = await c.req.parseBody()
+  const comment = addComment(body)
+
+  dbEvents.emit('entity-created', comment)
+
+  return c.html(
+    renderCommentForm()
+  )
+})
+
+app.get('/api/comments', async (c) => {
+
+  return c.html(
+    renderCommentsDiv()
+  )
+})
+
+app.use('/sse/*', async (c, next) => {
+  c.header('Content-Type', 'text/event-stream');
+  c.header('Cache-Control', 'no-cache');
+  c.header('Connection', 'keep-alive');
+  await next();
+});
+
+app.get('/sse', (c) => {
+  return stream(c, async (stream) => {
+
+    // This function runs whenever 'entity-created' is emitted
+    const listener = async (data) => {
+
+      console.log('data:', data);
+      const jsonString = JSON.stringify(data)
+
+      await stream.write('event: database-update\n')
+      await stream.write(`data: signals ${jsonString}\n\n`);
+    };
+
+    // 1. Start listening
+    dbEvents.on('entity-created', listener);
+
+    // 2. Clean up if the user closes the tab
+    stream.onAbort(() => {
+      dbEvents.off('entity-created', listener);
+      // console.log('Client disconnected');
+    });
+
+    // 3. Keep-alive loop (prevents timeout)
+    while (true) {
+      await stream.write('event: ping\n')
+      await stream.write(`data: signals {time_stamp: '${new Date().toLocaleTimeString()}'}\n\n`);
+      await stream.sleep(20000);
+    }
+   })
+});
+
+// export default app
+export default {
+  port: 3000,
+  idleTimeout: 60, // Time in seconds
+  fetch: app.fetch,
+}
