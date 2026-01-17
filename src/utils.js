@@ -253,3 +253,35 @@ export function renderCommentsDiv() {
     </template>
   `
 }
+
+export function renderUsersWithEditLink() {
+
+  const rows = getUsersWithFilter()
+
+  return html`
+      <table id="table">
+        <thead>
+          <tr>
+            <th>Id</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => html`
+          <tr id="row-${r.id}">
+            <td>${r.id}</td>
+            <td>${r.first_name}</td>
+            <td>${r.email}</td>
+            <td><a href='/api/load-modal?id=${r.id}' target=htmz>Edit</a></td>
+           </tr>`
+           )}
+        </tbody>
+      </table>
+      <dialog id="modal-user">Empty</div>
+
+      <script>
+      </script>
+   `
+}

@@ -22,6 +22,9 @@ import { renderInfiniteScrollPage, renderNamesByPage } from "./utils.js";
 import { renderCommentForm, renderCommentsDiv } from "./utils.js";
 import { addComment } from "./db.js"
 
+import { renderUsersWithEditLink } from "./utils.js";
+import { getUserById , getUserByEmail} from "./db.js"
+
 const app = new Hono()
 
 const dbEvents = new EventEmitter()
@@ -84,6 +87,9 @@ app.get('/examples/', (c) => {
 
         <br>
         <a href='./server-events'>Server Events</a>
+
+        <br>
+        <a href='./dialog-form'>Dialog (Modal) Form</a>
       `
     })
   )
@@ -381,6 +387,132 @@ app.get('/sse', (c) => {
     }
    })
 });
+
+app.get('/examples/dialog-form', (c) => {
+
+  const result = layout({
+    title: "Dialog (Modal) Form",
+    body: `
+      ${renderUsersWithEditLink()}
+    `,
+    scripts: `
+      <script>
+      </script>
+      `
+  })
+
+  return c.html(result)
+})
+
+app.get('/api/load-modal', (c) => {
+  const id = parseInt(c.req.query('id') || '0')
+  console.log('id:', id)
+
+  const row = getUserById(+id)
+  console.log('row:', row)
+
+  return c.html(
+    `
+     <dialog open id="modal-user"> 
+         <form action="/examples/dialog-form/save" target=htmz method="POST">
+           <label>
+             First Name
+             <input type="text" name="first_name" value="${row.first_name}" required autofocus >
+            </label>
+           <label>
+             Last Name
+             <input type="text" name="last_name" value="${row.last_name}" required>
+           </label>
+           <label>
+             Email
+             <input type="text" name="email" value="${row.email}" required>
+           </label>
+           <button type="submit" style="width: auto;">Submit</button>
+           <button type="button" data-action="cancel">Cancel</button> 
+         </form>
+      </dialog>
+      <script>
+
+        const parent = document.currentScript.parentElement;
+        const  mainDoc = window.parent.document;
+
+        (function(){
+          // console.log('delay open dialog')
+        })()
+
+        const cancelBtn = parent.querySelector('button[data-action="cancel"]')
+        console.log('cancelBtn:', cancelBtn)
+      
+        cancelBtn.addEventListener('click', (event)=> {
+          event.preventDefault()
+
+          const modal = mainDoc.querySelector('dialog')
+          console.log('modal:', modal)
+
+          if (modal.hasAttribute('open')) {
+            modal.removeAttribute('open');
+          } 
+
+        })
+
+        const submitBtn = parent.querySelector('button[type="submit"]')
+        console.log('submitBtn:', submitBtn)
+
+        submitBtn.addEventListener('click', (event)=> {
+          console.log('submitBtn clicked')
+
+          const modal = mainDoc.querySelector('dialog')
+          if (modal.hasAttribute('open')) {
+            modal.removeAttribute('open');
+          } 
+        })
+
+      </script>
+  `
+  )
+});
+
+app.post('/examples/dialog-form/save', async (c) => {
+
+  const formDataObject = await c.req.parseBody()
+  console.log(formDataObject['email'])
+  
+
+  updateUser(formDataObject)
+
+  const row = getUserByEmail(formDataObject['email'])
+  console.log('row', row)
+    
+    return c.html(
+      `
+      <template id="tpl-row">
+        <tr id="row-${row.id}">
+          <td>${row.id}</td>
+          <td>${row.first_name}</td>
+          <td>${row.email}</td>
+          <td><a href='/api/load-modal?id=${row.id}' target=htmz>Edit</a></td>
+        </tr>
+      </template>
+
+      <script>
+        (function(){
+          console.log('Run function in html fragment!')
+
+          const parent = document.currentScript.parentElement;
+
+          const template = parent.querySelector('#tpl-row')
+          console.log('template:',template)
+
+          const mainDoc = window.parent.document
+          const dest = mainDoc.getElementById('row-${row.id}')
+
+          const clone = template.content.cloneNode(true);
+          dest.replaceWith(clone)
+        })()
+      </script>
+      `
+    )
+})
 
 // export default app
 export default {
